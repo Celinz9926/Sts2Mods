@@ -3,6 +3,7 @@ using MegaCrit.Sts2.Core.Entities.Merchant;
 using MegaCrit.Sts2.Core.Modding;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Cards;
+using MegaCrit.Sts2.Core.Models.Relics;
 using MegaCrit.Sts2.Core.Models.Characters;
 using System.Reflection;
 using MegaCrit.Sts2.Core.Rewards;
@@ -14,9 +15,7 @@ using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Nodes.CommonUi;
 using MegaCrit.Sts2.Core.Entities.Players;
-using MegaCrit.Sts2.Core.Nodes.Screens.CardSelection;
-using MegaCrit.Sts2.Core.Nodes.Screens.Overlays;
-using System.Reflection.Emit;
+using MegaCrit.Sts2.Core.Localization.DynamicVars;
 
 namespace StsSelfUseMod
 {
@@ -51,6 +50,7 @@ namespace StsSelfUseMod.config
         public static bool BrightestFlameUpgradeFlag = false;
         public static bool DirgeUpgradeFlag = false;
         public static bool AcrobaticsRarityRestoreFlag = false;
+        public static int SwordOfStoneElitenNum = 0;
 
         public static void Load()
         {
@@ -113,7 +113,10 @@ BrightestFlameUpgradeFlag = true
 
 [EventsState]
 # 湿滑木桥是否掉血
-BridgeLossHpFlag = true"
+BridgeLossHpFlag = true
+
+# 自定义石中剑精英数量(1-5，0为不修改)
+SwordOfStoneElitenNum = 1"
                     );
                 }
 
@@ -167,6 +170,7 @@ BridgeLossHpFlag = true"
 
                         case "[EventsState]":
                             if (key == "BridgeLossHpFlag") bool.TryParse(value, out BridgeLossHpFlag);
+                            if (key == "SwordOfStoneElitenNum") int.TryParse(value, out SwordOfStoneElitenNum);
                             break;
                     }
                 }
@@ -343,6 +347,29 @@ namespace StsSelfUseMod.Patches
             if (!config.ModConfig.BridgeLossHpFlag) return;
 
             __result = 0;
+        }
+    }
+
+    //自定义石中剑精英数量
+    [HarmonyPatch(typeof(SwordOfStone), "get_CanonicalVars")]
+    public static class Patch_SwordOfStoneEliteNum
+    {
+        static void Postfix(ref IEnumerable<DynamicVar> __result)
+        {
+            int eliteNum = Math.Clamp(
+                config.ModConfig.SwordOfStoneElitenNum,
+                0,
+                5
+            );
+
+            // 0 = 不修改
+            if (eliteNum == 0)
+                return;
+
+            __result = new List<DynamicVar>
+            {
+                new DynamicVar("Elites", eliteNum)
+            };
         }
     }
 
