@@ -51,6 +51,7 @@ namespace StsSelfUseMod.config
         public static bool DirgeUpgradeFlag = false;
         public static bool AcrobaticsRarityRestoreFlag = false;
         public static int SwordOfStoneElitenNum = 0;
+        public static bool SilkenTressLossGoldFlag = false;
 
         public static void Load()
         {
@@ -116,7 +117,10 @@ BrightestFlameUpgradeFlag = true
 BridgeLossHpFlag = true
 
 # 自定义石中剑精英数量(1-5，0为不修改)
-SwordOfStoneElitenNum = 1"
+SwordOfStoneElitenNum = 1
+
+# 华美发束获得后不再丢失金币
+SilkenTressLossGoldFlag = true"
                     );
                 }
 
@@ -171,6 +175,7 @@ SwordOfStoneElitenNum = 1"
                         case "[EventsState]":
                             if (key == "BridgeLossHpFlag") bool.TryParse(value, out BridgeLossHpFlag);
                             if (key == "SwordOfStoneElitenNum") int.TryParse(value, out SwordOfStoneElitenNum);
+                            if (key == "SilkenTressLossGoldFlag") bool.TryParse(value, out SilkenTressLossGoldFlag);
                             break;
                     }
                 }
@@ -187,6 +192,7 @@ SwordOfStoneElitenNum = 1"
 
 namespace StsSelfUseMod.Patches
 {
+    //=========================基础功能=========================
     // 初始能量
     [HarmonyPatch(typeof(CharacterModel), "get_MaxEnergy")]
     public static class Patch_MaxEnergy
@@ -338,41 +344,7 @@ namespace StsSelfUseMod.Patches
         }
     }
 
-    //湿滑木桥不掉血
-    [HarmonyPatch(typeof(SlipperyBridge), "get_CurrentHpLoss")]
-    public static class Patch_BridgeLossHp
-    {
-        static void Postfix(ref int __result)
-        {
-            if (!config.ModConfig.BridgeLossHpFlag) return;
-
-            __result = 0;
-        }
-    }
-
-    //自定义石中剑精英数量
-    [HarmonyPatch(typeof(SwordOfStone), "get_CanonicalVars")]
-    public static class Patch_SwordOfStoneEliteNum
-    {
-        static void Postfix(ref IEnumerable<DynamicVar> __result)
-        {
-            int eliteNum = Math.Clamp(
-                config.ModConfig.SwordOfStoneElitenNum,
-                0,
-                5
-            );
-
-            // 0 = 不修改
-            if (eliteNum == 0)
-                return;
-
-            __result = new List<DynamicVar>
-            {
-                new DynamicVar("Elites", eliteNum)
-            };
-        }
-    }
-
+    //=========================卡牌调整=========================
     //残影升级格挡保留追加一回合
     [HarmonyPatch(typeof(Blur), "OnUpgrade")]
     public static class Patch_BlurUpgrade
@@ -446,8 +418,58 @@ namespace StsSelfUseMod.Patches
         {
             if (!config.ModConfig.BrightestFlameUpgradeFlag) return;
 
-            __instance.DynamicVars.MaxHp.UpgradeValueBy(-1m);
+            __instance.DynamicVars.MaxHp.UpgradeValueBy(-2m);
         }
     }
 
+    //=========================事件及遗物调整=========================
+    //湿滑木桥不掉血
+    [HarmonyPatch(typeof(SlipperyBridge), "get_CurrentHpLoss")]
+    public static class Patch_BridgeLossHp
+    {
+        static void Postfix(ref int __result)
+        {
+            if (!config.ModConfig.BridgeLossHpFlag) return;
+
+            __result = 0;
+        }
+    }
+
+    //自定义石中剑精英数量
+    [HarmonyPatch(typeof(SwordOfStone), "get_CanonicalVars")]
+    public static class Patch_SwordOfStoneEliteNum
+    {
+        static void Postfix(ref IEnumerable<DynamicVar> __result)
+        {
+            int eliteNum = Math.Clamp(
+                config.ModConfig.SwordOfStoneElitenNum,
+                0,
+                5
+            );
+
+            // 0 = 不修改
+            if (eliteNum == 0)
+                return;
+
+            __result = new List<DynamicVar>
+            {
+                new DynamicVar("Elites", eliteNum)
+            };
+        }
+    }
+
+    //华美发束获得后不再丢失金币
+    [HarmonyPatch(typeof(SilkenTress), "AfterObtained")]
+    public static class Patch_SilkenTressLossGold
+    {
+        static bool Prefix(ref Task __result)
+        {
+            if (!config.ModConfig.SilkenTressLossGoldFlag)
+                return true;
+
+            // 跳过原逻辑（LoseGold），直接返回已完成的任务
+            __result = Task.CompletedTask;
+            return false;
+        }
+    }
 }
